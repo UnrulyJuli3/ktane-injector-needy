@@ -1,0 +1,8 @@
+{
+  "name": "InjectorNeedy",
+  "references": [
+    "GameProxies"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": []
+}

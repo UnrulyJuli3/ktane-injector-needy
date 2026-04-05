@@ -1,0 +1,10 @@
+{
+  "name": "InjectorNeedy-Editor",
+  "references": [
+    "InjectorNeedy"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": []
+}
