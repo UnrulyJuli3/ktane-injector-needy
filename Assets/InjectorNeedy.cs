@@ -4,20 +4,21 @@
 // Source: https://github.com/Emik03/wawa
 
 using System;
-using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using Random = UnityEngine.Random;
 using System.IO;
-using Newtonsoft.Json;
-using System.Text;
-using UnityEngine.Networking;
 using System.Linq;
-using static Assets.Scripts.Mods.ModInfo;
-using Assets.Scripts.Records;
-using Assets.Scripts.Missions;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
+using Assets.Scripts.Missions;
+using Assets.Scripts.Records;
+using Assets.Scripts.Rules;
+using Newtonsoft.Json;
+using TMPro;
+using UnityEngine;
+using UnityEngine.Networking;
+using static Assets.Scripts.Mods.ModInfo;
 
 public sealed class InjectorNeedy : MonoBehaviour
 {
@@ -55,8 +56,6 @@ public sealed class InjectorNeedy : MonoBehaviour
 
     private static KtaneModule[] s_repoData;
 
-    private static IEnumerable<KtaneModule> s_trivialModules;
-
     private static event Action s_repoEvent;
 
     private static int s_lastModuleId;
@@ -77,6 +76,10 @@ public sealed class InjectorNeedy : MonoBehaviour
 
     private float _nextCountdownTime;
 
+    private bool _isCountdownReady;
+
+    private bool _isCountdownStarted;
+
     private bool _isNeedyActivated;
 
     private Coroutine _needyActivateRoutine;
@@ -92,6 +95,12 @@ public sealed class InjectorNeedy : MonoBehaviour
     private Selectable _instantiatedSelectable;
 
     private string _nestedTag;
+
+    private NeedyTimer _needyTimer;
+
+    private TextMeshPro _needyDisplayText;
+
+    private InjectorModSettings _modConfig;
 
     private readonly List<string> _logQueue = new List<string>();
 
@@ -120,7 +129,7 @@ public sealed class InjectorNeedy : MonoBehaviour
 
     private static readonly string[] s_blacklistedMods = new string[]
     {
-
+        "watchingPaintDry", // softlock
     };
 
     private void Log(string message) => Debug.Log($"[{_needy.ModuleDisplayName} #{_moduleId}] {message}");
@@ -173,19 +182,90 @@ public sealed class InjectorNeedy : MonoBehaviour
         _selectable.OnLeft += () => _instantiatedSelectable?.OnLeft?.Invoke();
         _selectable.OnRight += () => _instantiatedSelectable?.OnRight?.Invoke();
 
+        _needyTimer = GetComponentInChildren<NeedyTimer>();
+        _needyDisplayText = Instantiate(_needyTimer.Display.DisplayText, _needyTimer.Display.DisplayText.transform.parent);
+        _needyTimer.Display.DisplayText.enabled = false;
+        _needyDisplayText.enableAutoSizing = false;
+        _needyDisplayText.fontSize = 17f;
+        _needyDisplayText.margin = new Vector4(0f, 0.34f, 0f, 0f);
+
+        // _modConfig = new Config<InjectorModSettings>().Read();
+        _modConfig = new ModConfig<InjectorModSettings>("InjectorSettings").Read();
+
+        if (_modConfig.HasWhitelist)
+            Log($"WHITELIST SETTING IS ENABLED! Whitelisted modules: {_modConfig.WhitelistModIds.Join(", ")}");
+
+        ReplaceButtonRules();
+
         WaitForRepo();
+    }
+
+    private void ReplaceButtonRules()
+    {
+        var ruleSet = RuleManager.Instance.ButtonRuleSet;
+        foreach (var rule in ruleSet.HoldRuleList)
+        {
+            if (rule.Solution.Name.StartsWith("ButtonRelease"))
+            {
+                LogLower($"Replacing solution {rule.Solution.Name} for rule: {rule}");
+                string digit = rule.Solution.Name.Replace("ButtonRelease", "");
+                rule.Solution = new Solution
+                {
+                    Name = $"InjectorNeedy_ButtonRelease{digit}",
+                    Text = $"release when the countdown timer has a {digit} in any position.",
+                    SolutionMethod = (component, args) => GetButtonFormattedTime(component).Contains(digit) ? 0 : 1,
+                };
+            }
+            else if (rule.Solution.Name.StartsWith("BombTimerModifier_ButtonRelease"))
+            {
+                LogLower($"Replacing BombTimerModifier solution {rule.Solution.Name} for rule: {rule}");
+                var btmSolutionMethod = rule.Solution.SolutionMethod;
+                string digit = rule.Solution.Name.Replace("ButtonRelease", "");
+                rule.Solution = new Solution
+                {
+                    Name = $"InjectorNeedy_ButtonRelease{digit}",
+                    Text = $"release when the countdown timer has a {digit} in any position.",
+                    SolutionMethod = (component, args) => component.GetComponentInParent<InjectorNeedy>() ? GetButtonFormattedTime(component).Contains(digit) ? 0 : 1 : btmSolutionMethod(component, args),
+                };
+            }
+        }
+    }
+
+    private static string GetButtonFormattedTime(BombComponent component)
+    {
+        var needy = component.GetComponentInParent<InjectorNeedy>();
+        if (needy)
+            return needy.GetBombInfoFormattedTime();
+
+        return component.Bomb.GetTimer().text.text;
+    }
+
+    private void Update()
+    {
+        UpdateDisplay();
+    }
+
+    private void UpdateDisplay()
+    {
+        if (_needyTimer.isRunning && _isCountdownReady)
+        {
+            _needyDisplayText.text = GetBombInfoFormattedTime();
+        }
+        else
+        {
+            _needyDisplayText.text = "";
+        }
     }
 
     private void OnFetchComplete(string raw, string source)
     {
         var res = JsonConvert.DeserializeObject<KtaneResponse>(raw);
         s_repoData = res.Modules;
-        s_trivialModules = s_repoData.Where(RepoFilter);
         s_hasFetchedRepo = true;
         s_isFetchingRepo = false;
         s_repoEvent?.Invoke();
         Log($"Loaded data (Modules: {s_repoData.Length}, Source: {source})");
-        LogLower($"Pool of mods to choose from: {s_trivialModules.Select(m => m.Name).Join(", ")}");
+        LogLower($"Pool of mods to choose from: {s_repoData.Where(RepoFilter).Select(m => $"{m.Name} ({m.ModuleId})").Join(", ")}");
     }
 
     private IEnumerator DoFetchRepo()
@@ -288,12 +368,13 @@ public sealed class InjectorNeedy : MonoBehaviour
         return true;
     }
 
-    public static bool RepoFilter(KtaneModule mod)
+    private bool RepoFilter(KtaneModule mod)
     {
         if (!string.IsNullOrEmpty(mod.TranslationOf)) return false;
         if (mod.Type != "Regular") return false;
         if (mod.Origin != "Mods") return false;
         if (s_blacklistedMods.Contains(mod.ModuleId)) return false;
+        if (_modConfig.HasWhitelist && !_modConfig.WhitelistModIds.Contains(mod.ModuleId)) return false;
         // if (!s_whitelistedDifficulties.Contains(mod.DefuserDifficulty)) return false;
         // if (!s_whitelistedDifficulties.Contains(mod.ExpertDifficulty)) return false;
         // if (!((mod.TwitchPlays != null && mod.TwitchPlays.Score <= 5) || (mod.DefuserDifficulty == "Trivial" && mod.ExpertDifficulty == "Trivial"))) return false;
@@ -320,20 +401,24 @@ public sealed class InjectorNeedy : MonoBehaviour
         _nextComponent = null;
         _nextCountdownTime = _needy.CountdownTime;
 
+        // display the tester module if it is currently bundled
+        if (ModManager.Instance.loadedBombComponents.ContainsKey("InjectorTester") && SetNextComponent(ModManager.Instance.loadedBombComponents["InjectorTester"]))
+            yield break;
+
         if (s_repoData != null)
         {
             // loadedBombComponents INCLUDES unloaded dbml modules btw. tweaks just sticks a bunch of fake modules in there to trick the game
             var loaded = ModManager.Instance.loadedBombComponents;
 
             // a list of "applicable" mods that are also loaded
-            var overlap = s_trivialModules.Where(m => loaded.ContainsKey(m.ModuleId));
+            var overlap = s_repoData.Where(RepoFilter).Where(m => loaded.ContainsKey(m.ModuleId));
 
             if (overlap.Any())
             {
                 var repoMod = overlap.PickRandom();
                 LogLower($"Selected {repoMod.ModuleId} ({repoMod.Name})");
 
-                var timeCandidate = repoMod.TwitchPlays != null ? 30f + (float)repoMod.TwitchPlays.Score * 12f : _needy.CountdownTime;
+                var timeCandidate = repoMod.TwitchPlays != null ? 45f + (float)repoMod.TwitchPlays.Score * 15f : _needy.CountdownTime;
 
                 var loadedComponent = loaded[repoMod.ModuleId];
                 if (IsFakeModule(loadedComponent))
@@ -567,6 +652,9 @@ public sealed class InjectorNeedy : MonoBehaviour
 
     private IEnumerator HandleNeedyActivation()
     {
+        _isCountdownStarted = false;
+        _isCountdownReady = false;
+
         if (_isPreloading)
         {
             LogLower("Attempted to activate needy but module is still preloading. Waiting...");
@@ -597,6 +685,8 @@ public sealed class InjectorNeedy : MonoBehaviour
         }
 
         _needy.SetNeedyTimeRemaining(_nextCountdownTime);
+        _isCountdownReady = true;
+        UpdateDisplay();
 
         Log($"Instantiating {_nextComponent.GetModuleDisplayName()} ({_nextComponent.name})");
 
@@ -608,9 +698,28 @@ public sealed class InjectorNeedy : MonoBehaviour
         // destroy previous component if it still exists (a replacement for the old DeactivateComponent(true) invocation)
         OnPageLowerEnded();
 
+        var bombInfos = _nextComponent.GetComponentsInChildren<KMBombInfo>(true);
+        foreach (var bombInfo in bombInfos)
+        {
+            if (!bombInfo.GetComponent<InjectorBombInfo>())
+            {
+                LogLower($"Replacing bomb info for {bombInfo}");
+
+                var defaultBombInfo = bombInfo.GetComponent<ModBombInfo>();
+                if (defaultBombInfo)
+                    DestroyImmediate(defaultBombInfo);
+
+                bombInfo.gameObject.AddComponent<InjectorBombInfo>();
+            }
+        }
+
+        _nextComponent.transform.localScale = Vector3.one / _moduleAnchor.lossyScale.x;
+
         // spawn the mod on the thing
         var component = Instantiate(_nextComponent, _moduleAnchor);
         _instantiatedComponent = component;
+
+        _nextComponent.transform.localScale = Vector3.one;
 
         // make sure the mod's dimensions are all squared away with the transform of the anchor
         component.transform.localPosition = Vector3.zero;
@@ -624,17 +733,20 @@ public sealed class InjectorNeedy : MonoBehaviour
 
         _instantiatedSelectable = component.GetComponent<Selectable>();
 
-        var currentSelectable = KTInputManager.Instance.GetCurrentSelectable();
+        // var currentSelectable = KTInputManager.Instance.GetCurrentSelectable();
 
-        // now selectables!! you can see all my commented out attempts at making this work in january
+        bool shouldCancel = KTInputManager.Instance.SelectableManager.CurrentParent == _selectable || KTInputManager.Instance.SelectableManager.CurrentParent == _dummySelectable;
+
+        _selectable.DeactivateImmediateChildSelectableAreas();
+
         _selectable.Children[0] = _instantiatedSelectable;
-        // _selectable.IsPassThrough = true;
         _instantiatedSelectable.Parent = _selectable;
         _instantiatedSelectable.IsPassThrough = true;
-        // _instantiatedSelectable.Highlight.gameObject.SetActive(false);
-        // _instantiatedSelectable.SelectableArea.DeactivateSelectableArea();
-        // _instantiatedSelectable.SelectableArea = null;
-        // _instantiatedSelectable.GetComponentsInChildren<BackgroundOccluder>();
+        _selectable.Init();
+
+        if (KTInputManager.Instance.IsMotionControlMode())
+            _selectable.ActivateMotionControls();
+
         foreach (var occluder in component.GetComponentsInChildren<CrosshairOccluder>())
         {
             // vanillas have a lot of "crosshair occluders" which are fun but they mess things up when we're trying to access the needy from the outside. so we'll just disable those
@@ -643,28 +755,17 @@ public sealed class InjectorNeedy : MonoBehaviour
                 collider.enabled = false;
         }
 
-        foreach (var selectable in component.GetComponentsInChildren<KMSelectable>())
+        // i acknowledge this may not apply to any selectables that get generated later but this should work enough for our purposes
+        foreach (var selectable in component.GetComponentsInChildren<KMSelectable>(true))
         {
             // overwrite AddInteractionPunch for all submodule selectables in order to lessen the intensity (by multiplying by how much we are scaling down the module)
-            selectable.OnInteractionPunch = (intensity) => KTInputManager.Instance.AddInteractionPunch(selectable.transform.position, Assets.Scripts.Input.AbstractHapticUtil.HapticType.Interaction, intensity * 0.412905157f, 0.75f, 0.3f);
+            selectable.OnInteractionPunch = intensity => KTInputManager.Instance.AddInteractionPunch(selectable.transform.position, Assets.Scripts.Input.AbstractHapticUtil.HapticType.Interaction, intensity * 0.412905157f, 0.75f, 0.3f);
         }
 
-        // basically UpdateChildren
-        _selectable.Init();
-
-        // commented out here is some debug logging. this pretty much just checks if we're currently selecting the mod and fixes the selectable situation a little bit.
-        // A FEW SELECTABLE THINGS ARE STILL NOT PERFECT BUT THAT'S OKAY!!
-
-        // LogLower($"currentSelectable: {currentSelectable}, currentSelectable.Parent: {currentSelectable.Parent}, currentSelectable.Parent.Parent: {currentSelectable.Parent.Parent}, _selectable: {_selectable}");
-        // if (currentSelectable && (currentSelectable.Parent == _selectable || (currentSelectable.Parent && currentSelectable.Parent.Parent == _selectable)))
-        if (currentSelectable && currentSelectable.Parent == _selectable)
+        // if (currentSelectable && currentSelectable.Parent == _selectable)
+        if (shouldCancel)
         {
-            // LogLower("condition met");
-            // _selectable.HandleInteract(); // this never worked
-            // _instantiatedSelectable.OnDrillTo(); // this kinda worked?
-            // LogLower("OnDrillTo invoked");
-            KTInputManager.Instance.Select(_instantiatedSelectable);
-            KTInputManager.Instance.Select(_instantiatedSelectable.GetCurrentChild());
+            StartCoroutine(CancelRoutine());
         }
 
         yield return null;
@@ -684,6 +785,17 @@ public sealed class InjectorNeedy : MonoBehaviour
         }
 
         _logQueue.Clear();
+
+        // hold the timer at its initial value for 2s, to simulate how the bomb timer works
+        float elapsed = 0f;
+        while (elapsed < 2f)
+        {
+            _needy.SetNeedyTimeRemaining(_nextCountdownTime);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        _isCountdownStarted = true;
     }
 
     private bool OnNestedPass(BombComponent component)
@@ -743,6 +855,15 @@ public sealed class InjectorNeedy : MonoBehaviour
         return false;
     }
 
+    private IEnumerator CancelRoutine()
+    {
+        KTInputManager.Instance.Select(_selectable.Parent);
+        KTInputManager.Instance.SelectableManager.HandleInteract();
+        yield return null;
+        KTInputManager.Instance.Select(_selectable);
+        KTInputManager.Instance.SelectableManager.HandleInteract();
+    }
+
     private void DeactivateComponent()
     {
         if (_needyActivateRoutine != null)
@@ -753,15 +874,36 @@ public sealed class InjectorNeedy : MonoBehaviour
 
         if (_instantiatedComponent)
         {
-            var currentSelectable = KTInputManager.Instance.GetCurrentSelectable();
+            // var currentSelectable = KTInputManager.Instance.GetCurrentSelectable();
+
+            // bool shouldCancel = currentSelectable.Parent == _selectable.Children[0];
+            bool shouldCancel = KTInputManager.Instance.SelectableManager.CurrentParent == _selectable || KTInputManager.Instance.SelectableManager.CurrentParent == _dummySelectable;
+
+            // if (shouldCancel)
+            //     KTInputManager.Instance.HandleCancel();
 
             _selectable.Children[0] = _dummySelectable;
             _selectable.Init();
 
-            if (currentSelectable && (currentSelectable.Parent == _selectable || (currentSelectable.Parent && currentSelectable.Parent.Parent == _selectable)))
-                _selectable.OnDrillTo();
+            if (shouldCancel)
+            {
+                StartCoroutine(CancelRoutine());
+            }
 
-            KTInputManager.Instance.SelectableManager.Select(_dummySelectable, false);
+            /* if (currentSelectable && (currentSelectable.Parent == _selectable || (currentSelectable.Parent && currentSelectable.Parent.Parent == _selectable)))
+                _selectable.OnDrillTo(); */
+
+            /* if (currentSelectable && currentSelectable.Parent == _selectable)
+            {
+                _selectable.OnDrillTo();
+                currentSelectable.SetHighlight(false);
+                KTInputManager.Instance.Select(_dummySelectable);
+            } */
+
+            if (KTInputManager.Instance.IsMotionControlMode())
+                _selectable.ActivateMotionControls();
+
+            // KTInputManager.Instance.SelectableManager.Select(_dummySelectable, false);
 
             // remove these events! the module doesn't stop listening for these when it's destroyed so it throws exceptions :(
             var holdable = _instantiatedComponent.Bomb.GetComponent<FloatingHoldable>();
@@ -824,6 +966,63 @@ public sealed class InjectorNeedy : MonoBehaviour
             Preload();
         }
     }
+
+    internal float GetBombInfoTime() => _needyTimer.isRunning ? _isCountdownStarted ? _needyTimer.TimeRemaining : _nextCountdownTime : 0f;
+
+    internal string GetBombInfoFormattedTime()
+    {
+        float seconds = GetBombInfoTime();
+        float clampedSeconds = seconds < 0f ? 0f : seconds;
+
+        int totalMinutes = (int)(clampedSeconds / 60);
+        int totalSeconds = (int)(clampedSeconds % 60);
+        int totalMilliseconds = (int)(clampedSeconds * 10 % 10);
+
+        if (clampedSeconds < 60)
+            return string.Format("{0:D2}.{1}", totalSeconds, totalMilliseconds);
+
+        return string.Format("{0}:{1:D2}", totalMinutes, totalSeconds);
+    }
+
+    internal int GetBombInfoStrikes()
+    {
+        return GetComponentInParent<Bomb>().NumStrikes;
+    }
+
+    private List<string> GetSubmoduleNameList()
+    {
+        if (_instantiatedComponent)
+            return new List<string> { _instantiatedComponent.GetModuleDisplayName() };
+
+        return new List<string>();
+    }
+
+    private List<string> GetSubmoduleIDList()
+    {
+        if (_instantiatedComponent)
+        {
+            string id = _instantiatedComponent.ComponentType.ToString();
+            var modComponent = _instantiatedComponent.GetComponent<ModBombComponent>();
+            if (modComponent)
+                id = modComponent.GetModComponentType();
+
+            return new List<string> { id };
+        }
+
+        return new List<string>();
+    }
+
+    internal List<string> GetBombInfoModuleNames() => GetSubmoduleNameList();
+
+    internal List<string> GetBombInfoSolvableModuleNames() => GetSubmoduleNameList();
+
+    internal List<string> GetBombInfoSolvedModuleNames() => new List<string>();
+
+    internal List<string> GetBombInfoModuleIDs() => GetSubmoduleIDList();
+
+    internal List<string> GetBombInfoSolvableModuleIDs() => GetSubmoduleIDList();
+
+    internal List<string> GetBombInfoSolvedModuleIDs() => new List<string>();
 
     // throwing TP out the window. just not happening rn. maybe someday
 
