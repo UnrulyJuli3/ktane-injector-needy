@@ -129,7 +129,93 @@ public sealed class InjectorNeedy : MonoBehaviour
 
     private static readonly string[] s_blacklistedMods = new string[]
     {
-        "watchingPaintDry", // softlock
+        "PartyTime", //rng will screw you over
+        "matrix", //just seems fucked in 2m
+        "AppreciateArt", //the visual effect doesn't get removed, it is permanent
+        "sorting", //couldn't be deemed suitable by the community
+        "lgndReflex", //skill check mod which seemed unsuitable especially when it can appear multiple times
+        "100LevelsOfDefusal", //even if you know the method the time isn't there
+        "assemblyCode", //3 stages of carpal tunnel input
+        "0", //definitely not always doable in 45s; tp scoring is dynamic
+        "TheExplodingPen", //not possible given how it functions
+        "SaimoePad", //3-5 stages of identification, 4 images each, in 2 minutes is not happening
+        "simonSubdivides", //way too difficult
+        "watchingPaintDry", //softlock
+        "xelFaceRecognition", //id mod that can't be done in time within reason
+        "2048", //while possible it's difficult to do in time
+        "labeledPrioritiesPlus", //expectations are too high this is 7 dense pages long
+        "quizbowl", //this mod expects a lot from you and injector's already difficult enough w/o it
+        "logicChess", //^ditto
+        "uncoloredKeysModule", //couldn't be deemed suitable by the community
+        "cursorMazeModule", //softlock
+        "birthdayCake", //too little time + too dependent on timer
+        "trickOrTreat", //not happening in 2m
+        "BlackButtonModule", //forced into a long hold, non-trivial math, reading tiny capacitor is miserable --asew
+        "omniman", //seems theoretically possible for it not to happen in 45s
+        "extendedButtonOrder", //technically possible but so tight timewise
+        "TalkingPoints", //difficult on voice and even efm a lot of the time
+        "timeMachine", //takes longer than 2m --play
+        "xelOccultManuscripts", //d/e seems practically impossible due to the # of symbols that need to be described
+        "zModule", //couldn't be deemed suitable by the community
+        "Wordle", //keyboard doesn't work
+        "widgetry", //softlock
+        "memeReviewModule", //luck-dependant on how long it acc takes to solve + internet connection can screw you --play
+        "speedTest", //you barely have time to calc before needing to press over 300 times,
+        "cipherMachine", //way too difficult; tp scoring is dynamic
+        "MemoryCharacter", //module clips which can theoretically hinder what would've otherwise been a solved module
+        "abilities", //practically requires you play league
+        "yoshiEgg", //unreasonable dependance on timer and not enough time
+        "Spiderman2004", //would probably break your hand if you did it
+        "coloredCube", //seems unreasonable
+        "OvercoloredSquaresModule", //seems a bit much d/e, all colors would need to be read
+        "intensityLevels", //too much to ask in the time limit
+        "PapyrusTiles", //likely not possible a lot of the time in 2m
+        "HiraganaModule", //too involved for the average player to be able to do on the fly
+        "KatakanaModule", //^ditto
+        "ShiritoriModule", //^ditto
+        "DivisionModule", //takes too long
+        "MultiplicationModule", //^ditto
+        "SubtractionModule", //^ditto
+        "tapFast", //skill check, same reason as Reflex
+        "GSJumbledButtons", //puzzle mod out of the "can either take a minute or way too long to solve" variety --play
+        "QModule", //keyboard doesn't work
+        "BaseConversion", //input does not work? this mod is buggy so
+        "theLight", //you'd need to figure out which light you're looking at before you can even start; it's not quick
+        "notThePsychicLight", //^ditto
+        "grimmModule", //too tight
+        "voltaicMorseModule", //couldn't be deemed suitable by the community
+        "GSKillSwitch", //seems cheesable which is bad for either module
+        "answerSmashModule", //keyboard doesn't work
+        "connectedQuizbowl", //see original Quizbowl
+        "weezer", //couldn't be deemed suitable by the community
+        "GSAutokey", //looks buggy, kinda pointless in the context of Injector
+        "discography", //would take significant practice to do within time limit it seems
+        "YellowLevers", //seems possible to take longer than 2m
+        "rpstour", //too much id + a whole process is yikes
+        "limeArrowsModule", //it would require a lot of experience [to solve in 2m] --thunder
+        "bobParableUfo", //couldn't be deemed suitable by the community
+        "neverFadeAway", //takes longer than 2m --play
+        "saltedCashews", //this module seems to not take itself seriously to the point where it seems like it's complete rng
+        "satelliteFlight", //obvi manual takes 2 minutes to read; also hard module allegedly
+        "fullClear", //couldn't be deemed suitable by the community
+        "abnoChoice", //looks way too involved
+        
+        //everything below is due to their TP scores not being finalized; below is what the sheet says at time of writing
+        //if Injector is changed so these modules can no longer be injected, they can be removed from here
+        
+        "faultyColoredCube", //UN 11
+        "perspecticoloredCube", //UN 11
+        "varicoloredCube", //UN 15
+        "hyperage", //UN 12
+        "TrickyTetrisPieces", //UN 7
+        "cruelDividableBy2", //UN 11
+        "morselCode", //UN 6
+        "eclipse", //UN 35
+        "galaticFragility", //UN 12
+        "NotLightCycleModule", //UN 10
+        "NotOrientationCubeModule", //UN 8
+        "PerspecticolourFlashModule", //UN 15
+        "frogRgbTree", //UN 12
     };
 
     private void Log(string message) => Debug.Log($"[{_needy.ModuleDisplayName} #{_moduleId}] {message}");
