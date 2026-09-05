@@ -384,6 +384,12 @@ public sealed class InjectorNeedy : MonoBehaviour
             if (req.isHttpError || req.isNetworkError)
             {
                 Log($"Failed to load repository data from {_repoUrl}: [{req.responseCode}] {req.error}");
+
+                // well we can at least use the backup as a last resort. even if it's old
+                if (File.Exists(backupPath))
+                {
+                    OnFetchComplete(File.ReadAllText(backupPath, Encoding.UTF8), "TweaksBackup");
+                }
             }
             else
             {
