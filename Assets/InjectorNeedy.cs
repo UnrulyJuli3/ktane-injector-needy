@@ -84,8 +84,6 @@ public sealed class InjectorNeedy : MonoBehaviour
 
     private Coroutine _needyActivateRoutine;
 
-    // private Coroutine _timerScrambleRoutine;
-
     private bool _isPreloading;
 
     private BombComponent _instantiatedComponent;
@@ -104,7 +102,7 @@ public sealed class InjectorNeedy : MonoBehaviour
 
     private readonly List<string> _logQueue = new List<string>();
 
-    private static readonly ComponentTypeEnum[] s_trivialVanillas = new[]
+    private static readonly ComponentTypeEnum[] s_vanillaWhitelist = new[]
     {
         ComponentTypeEnum.Wires,
         ComponentTypeEnum.BigButton,
@@ -119,103 +117,78 @@ public sealed class InjectorNeedy : MonoBehaviour
         ComponentTypeEnum.Password,
     };
 
-    /* private static readonly string[] s_whitelistedDifficulties = new[]
-    {
-        "Trivial",
-        "VeryEasy",
-        "Easy",
-        "Medium",
-    }; */
-
     private static readonly string[] s_blacklistedMods = new string[]
     {
-        "PartyTime", //rng will screw you over
-        "matrix", //just seems fucked in 2m
-        "AppreciateArt", //the visual effect doesn't get removed, it is permanent
-        "sorting", //couldn't be deemed suitable by the community
-        "lgndReflex", //skill check mod which seemed unsuitable especially when it can appear multiple times
-        "100LevelsOfDefusal", //even if you know the method the time isn't there
-        "assemblyCode", //3 stages of carpal tunnel input
-        "0", //definitely not always doable in 45s; tp scoring is dynamic
-        "TheExplodingPen", //not possible given how it functions
-        "SaimoePad", //3-5 stages of identification, 4 images each, in 2 minutes is not happening
-        "simonSubdivides", //way too difficult
-        "watchingPaintDry", //softlock
-        "xelFaceRecognition", //id mod that can't be done in time within reason
-        "2048", //while possible it's difficult to do in time
-        "labeledPrioritiesPlus", //expectations are too high this is 7 dense pages long
-        "quizbowl", //this mod expects a lot from you and injector's already difficult enough w/o it
-        "logicChess", //^ditto
-        "uncoloredKeysModule", //couldn't be deemed suitable by the community
-        "cursorMazeModule", //softlock
-        "birthdayCake", //too little time + too dependent on timer
-        "trickOrTreat", //not happening in 2m
-        "BlackButtonModule", //forced into a long hold, non-trivial math, reading tiny capacitor is miserable --asew
-        "omniman", //seems theoretically possible for it not to happen in 45s
-        "extendedButtonOrder", //technically possible but so tight timewise
-        "TalkingPoints", //difficult on voice and even efm a lot of the time
-        "timeMachine", //takes longer than 2m --play
-        "xelOccultManuscripts", //d/e seems practically impossible due to the # of symbols that need to be described
-        "zModule", //couldn't be deemed suitable by the community
-        "Wordle", //keyboard doesn't work
-        "widgetry", //softlock
-        "memeReviewModule", //luck-dependant on how long it acc takes to solve + internet connection can screw you --play
-        "speedTest", //you barely have time to calc before needing to press over 300 times,
-        "cipherMachine", //way too difficult; tp scoring is dynamic
-        "MemoryCharacter", //module clips which can theoretically hinder what would've otherwise been a solved module
-        "abilities", //practically requires you play league
-        "yoshiEgg", //unreasonable dependance on timer and not enough time
-        "Spiderman2004", //would probably break your hand if you did it
-        "coloredCube", //seems unreasonable
-        "OvercoloredSquaresModule", //seems a bit much d/e, all colors would need to be read
-        "intensityLevels", //too much to ask in the time limit
-        "PapyrusTiles", //likely not possible a lot of the time in 2m
-        "HiraganaModule", //too involved for the average player to be able to do on the fly
-        "KatakanaModule", //^ditto
-        "ShiritoriModule", //^ditto
-        "DivisionModule", //takes too long
-        "MultiplicationModule", //^ditto
-        "SubtractionModule", //^ditto
-        "tapFast", //skill check, same reason as Reflex
-        "GSJumbledButtons", //puzzle mod out of the "can either take a minute or way too long to solve" variety --play
-        "QModule", //keyboard doesn't work
-        "BaseConversion", //input does not work? this mod is buggy so
-        "theLight", //you'd need to figure out which light you're looking at before you can even start; it's not quick
-        "notThePsychicLight", //^ditto
-        "grimmModule", //too tight
-        "voltaicMorseModule", //couldn't be deemed suitable by the community
-        "GSKillSwitch", //seems cheesable which is bad for either module
-        "answerSmashModule", //keyboard doesn't work
-        "connectedQuizbowl", //see original Quizbowl
-        "weezer", //couldn't be deemed suitable by the community
-        "GSAutokey", //looks buggy, kinda pointless in the context of Injector
-        "discography", //would take significant practice to do within time limit it seems
-        "YellowLevers", //seems possible to take longer than 2m
-        "rpstour", //too much id + a whole process is yikes
-        "limeArrowsModule", //it would require a lot of experience [to solve in 2m] --thunder
-        "bobParableUfo", //couldn't be deemed suitable by the community
-        "neverFadeAway", //takes longer than 2m --play
-        "saltedCashews", //this module seems to not take itself seriously to the point where it seems like it's complete rng
-        "satelliteFlight", //obvi manual takes 2 minutes to read; also hard module allegedly
-        "fullClear", //couldn't be deemed suitable by the community
-        "abnoChoice", //looks way too involved
-        
-        //everything below is due to their TP scores not being finalized; below is what the sheet says at time of writing
-        //if Injector is changed so these modules can no longer be injected, they can be removed from here
-        
-        "faultyColoredCube", //UN 11
-        "perspecticoloredCube", //UN 11
-        "varicoloredCube", //UN 15
-        "hyperage", //UN 12
-        "TrickyTetrisPieces", //UN 7
-        "cruelDividableBy2", //UN 11
-        "morselCode", //UN 6
-        "eclipse", //UN 35
-        "galaticFragility", //UN 12
-        "NotLightCycleModule", //UN 10
-        "NotOrientationCubeModule", //UN 8
-        "PerspecticolourFlashModule", //UN 15
-        "frogRgbTree", //UN 12
+        "PartyTime", // rng will screw you over
+        "matrix", // just seems fucked in 2m
+        "AppreciateArt", // the visual effect doesn't get removed, it is permanent
+        "sorting", // couldn't be deemed suitable by the community
+        "lgndReflex", // skill check mod which seemed unsuitable especially when it can appear multiple times
+        "100LevelsOfDefusal", // even if you know the method the time isn't there
+        "assemblyCode", // 3 stages of carpal tunnel input
+        "0", // definitely not always doable in 45s; tp scoring is dynamic
+        "TheExplodingPen", // not possible given how it functions
+        "SaimoePad", // 3-5 stages of identification, 4 images each, in 2 minutes is not happening
+        "simonSubdivides", // way too difficult
+        "watchingPaintDry", // softlock
+        "xelFaceRecognition", // id mod that can't be done in time within reason
+        "2048", // while possible it's difficult to do in time
+        "labeledPrioritiesPlus", // expectations are too high this is 7 dense pages long
+        "quizbowl", // this mod expects a lot from you and injector's already difficult enough w/o it
+        "logicChess", // ^ditto
+        "uncoloredKeysModule", // couldn't be deemed suitable by the community
+        "cursorMazeModule", // softlock
+        "birthdayCake", // too little time + too dependent on timer
+        "trickOrTreat", // not happening in 2m
+        "BlackButtonModule", // forced into a long hold, non-trivial math, reading tiny capacitor is miserable --asew
+        "omniman", // seems theoretically possible for it not to happen in 45s
+        "extendedButtonOrder", // technically possible but so tight timewise
+        "TalkingPoints", // difficult on voice and even efm a lot of the time
+        "timeMachine", // takes longer than 2m --play
+        "xelOccultManuscripts", // d/e seems practically impossible due to the # of symbols that need to be described
+        "zModule", // couldn't be deemed suitable by the community
+        "Wordle", // keyboard doesn't work
+        "widgetry", // softlock
+        "memeReviewModule", // luck-dependant on how long it acc takes to solve + internet connection can screw you --play
+        "speedTest", // you barely have time to calc before needing to press over 300 times,
+        "cipherMachine", // way too difficult; tp scoring is dynamic
+        "MemoryCharacter", // module clips which can theoretically hinder what would've otherwise been a solved module
+        "abilities", // practically requires you play league
+        "yoshiEgg", // unreasonable dependance on timer and not enough time
+        "Spiderman2004", // would probably break your hand if you did it
+        "coloredCube", // seems unreasonable
+        "OvercoloredSquaresModule", // seems a bit much d/e, all colors would need to be read
+        "intensityLevels", // too much to ask in the time limit
+        "PapyrusTiles", // likely not possible a lot of the time in 2m
+        "HiraganaModule", // too involved for the average player to be able to do on the fly
+        "KatakanaModule", // ^ditto
+        "ShiritoriModule", // ^ditto
+        "DivisionModule", // takes too long
+        "MultiplicationModule", // ^ditto
+        "SubtractionModule", // ^ditto
+        "tapFast", // skill check, same reason as Reflex
+        "GSJumbledButtons", // puzzle mod out of the "can either take a minute or way too long to solve" variety --play
+        "QModule", // keyboard doesn't work
+        "BaseConversion", // input does not work? this mod is buggy so
+        "theLight", // you'd need to figure out which light you're looking at before you can even start; it's not quick
+        "notThePsychicLight", // ^ditto
+        "grimmModule", // too tight
+        "voltaicMorseModule", // couldn't be deemed suitable by the community
+        "GSKillSwitch", // seems cheesable which is bad for either module
+        "answerSmashModule", // keyboard doesn't work
+        "connectedQuizbowl", // see original Quizbowl
+        "weezer", // couldn't be deemed suitable by the community
+        "GSAutokey", // looks buggy, kinda pointless in the context of Injector
+        "discography", // would take significant practice to do within time limit it seems
+        "YellowLevers", // seems possible to take longer than 2m
+        "rpstour", // too much id + a whole process is yikes
+        "limeArrowsModule", // it would require a lot of experience [to solve in 2m] --thunder
+        "bobParableUfo", // couldn't be deemed suitable by the community
+        "neverFadeAway", // takes longer than 2m --play
+        "saltedCashews", // this module seems to not take itself seriously to the point where it seems like it's complete rng
+        "satelliteFlight", // obvi manual takes 2 minutes to read; also hard module allegedly
+        "fullClear", // couldn't be deemed suitable by the community
+        "abnoChoice", // looks way too involved
     };
 
     private void Log(string message) => Debug.Log($"[{_needy.ModuleDisplayName} #{_moduleId}] {message}");
@@ -352,6 +325,23 @@ public sealed class InjectorNeedy : MonoBehaviour
         s_repoEvent?.Invoke();
         Log($"Loaded data (Modules: {s_repoData.Length}, Source: {source})");
         LogLower($"Pool of mods to choose from: {s_repoData.Where(RepoFilter).Select(m => $"{m.Name} ({m.ModuleId})").Join(", ")}");
+
+        /* // DEBUG
+        foreach (var mod in s_repoData)
+        {
+            LogLower($"Mod: {mod.Name} ({mod.ModuleId})\n"
+            + $"RepoFilter: {RepoFilter(mod)}\n"
+            + $"Type: {mod.Type}\n"
+            + $"Origin: {mod.Origin}\n"
+            + $"Blacklisted: {s_blacklistedMods.Contains(mod.ModuleId)}\n"
+            + $"WhitelistViolation: {_modConfig.HasWhitelist && !_modConfig.WhitelistModIds.Contains(mod.ModuleId)}\n"
+            + $"TwitchPlays == null: {mod.TwitchPlays == null}\n"
+            + $"TwitchPlays.Score: {(mod.TwitchPlays == null ? "[TP is null]" : mod.TwitchPlays.Score.ToString())}\n"
+            + $"BossStatus: {mod.BossStatus}\n"
+            + $"Quirks: {mod.Quirks}\n"
+            + "------------------------------"
+            );
+        } */
     }
 
     private IEnumerator DoFetchRepo()
@@ -587,7 +577,7 @@ public sealed class InjectorNeedy : MonoBehaviour
 
         Log("Unable to load any modded modules. Falling back to vanilla modules.");
 
-        var compType = s_trivialVanillas.PickRandom();
+        var compType = s_vanillaWhitelist.PickRandom();
         Log($"Selected vanilla module: {compType}");
 
         var prefab = Prefabs.Instance.BombGenerator.componentPrefabs.FirstOrDefault(comp => comp.ComponentType == compType);
@@ -633,7 +623,6 @@ public sealed class InjectorNeedy : MonoBehaviour
         {
             _isNeedyActivated = true;
             _needyActivateRoutine = StartCoroutine(HandleNeedyActivation());
-            // _timerScrambleRoutine = StartCoroutine(TimerScramble());
         }
     }
 
@@ -718,30 +707,6 @@ public sealed class InjectorNeedy : MonoBehaviour
         TryMatchLog(logString);
     }
 
-    /* private IEnumerator TimerScramble()
-    {
-        int lastTime = 0;
-        while (true)
-        {
-            int time;
-            do time = Random.Range(1, 98);
-            while (time == lastTime);
-            lastTime = time;
-            // WHY DOES THE IN-GAME NEEDY TIMER *ROUND* THE TIME FOR THE DISPLAY INSTEAD OF FLOOR OR CEILING OR LITERALLY ANYTHING LOGICAL
-            _needy.SetNeedyTimeRemaining(time);
-            yield return new WaitForSeconds(0.25f);
-            _needy.SetNeedyTimeRemaining(time);
-            yield return new WaitForSeconds(0.25f);
-            // float started = Time.time;
-            // while ((Time.time - started) < 0.5f)
-            // {
-            //     _needy.SetNeedyTimeRemaining(time);
-            //     yield return null;
-            // }
-            // yield return new WaitForSeconds(0.5f);
-        }
-    } */
-
     private IEnumerator HandleNeedyActivation()
     {
         _isCountdownStarted = false;
@@ -825,9 +790,8 @@ public sealed class InjectorNeedy : MonoBehaviour
 
         _instantiatedSelectable = component.GetComponent<Selectable>();
 
-        // var currentSelectable = KTInputManager.Instance.GetCurrentSelectable();
-
-        bool shouldCancel = KTInputManager.Instance.SelectableManager.CurrentParent == _selectable || KTInputManager.Instance.SelectableManager.CurrentParent == _dummySelectable;
+        // are we focused on injector or anything inside of it?
+        bool shouldCancel = IsWithin(KTInputManager.Instance.SelectableManager.CurrentParent, _selectable);
 
         _selectable.DeactivateImmediateChildSelectableAreas();
 
@@ -835,6 +799,17 @@ public sealed class InjectorNeedy : MonoBehaviour
         _instantiatedSelectable.Parent = _selectable;
         _instantiatedSelectable.IsPassThrough = true;
         _selectable.Init();
+
+        if (_instantiatedSelectable.SelectableArea == null)
+            _instantiatedSelectable.CreateSelectableArea();
+        _instantiatedSelectable.SelectableArea?.ActivateSelectableArea();
+
+        // canceling from a submodule just puts you on injector so chain a second cancel to get to the bomb face
+        _instantiatedSelectable.OnCancel += () =>
+        {
+            StartCoroutine(DeferredSecondCancel());
+            return true;
+        };
 
         if (KTInputManager.Instance.IsMotionControlMode())
             _selectable.ActivateMotionControls();
@@ -854,7 +829,6 @@ public sealed class InjectorNeedy : MonoBehaviour
             selectable.OnInteractionPunch = intensity => KTInputManager.Instance.AddInteractionPunch(selectable.transform.position, Assets.Scripts.Input.AbstractHapticUtil.HapticType.Interaction, intensity * 0.412905157f, 0.75f, 0.3f);
         }
 
-        // if (currentSelectable && currentSelectable.Parent == _selectable)
         if (shouldCancel)
         {
             StartCoroutine(CancelRoutine());
@@ -947,6 +921,17 @@ public sealed class InjectorNeedy : MonoBehaviour
         return false;
     }
 
+    // walks up the Selectable ancestor chain to check whether `target` is `current` or one of its ancestors
+    private static bool IsWithin(Selectable current, Selectable target)
+    {
+        for (var s = current; s != null; s = s.Parent)
+        {
+            if (s == target)
+                return true;
+        }
+        return false;
+    }
+
     private IEnumerator CancelRoutine()
     {
         KTInputManager.Instance.Select(_selectable.Parent);
@@ -954,6 +939,13 @@ public sealed class InjectorNeedy : MonoBehaviour
         yield return null;
         KTInputManager.Instance.Select(_selectable);
         KTInputManager.Instance.SelectableManager.HandleInteract();
+    }
+
+    private IEnumerator DeferredSecondCancel()
+    {
+        yield return null;
+        if (KTInputManager.Instance.SelectableManager.CurrentParent == _instantiatedSelectable)
+            KTInputManager.Instance.SelectableManager.HandleCancel();
     }
 
     private void DeactivateComponent()
@@ -966,36 +958,23 @@ public sealed class InjectorNeedy : MonoBehaviour
 
         if (_instantiatedComponent)
         {
-            // var currentSelectable = KTInputManager.Instance.GetCurrentSelectable();
-
-            // bool shouldCancel = currentSelectable.Parent == _selectable.Children[0];
-            bool shouldCancel = KTInputManager.Instance.SelectableManager.CurrentParent == _selectable || KTInputManager.Instance.SelectableManager.CurrentParent == _dummySelectable;
-
-            // if (shouldCancel)
-            //     KTInputManager.Instance.HandleCancel();
+            // see comment in HandleNeedyActivation
+            bool shouldCancel = IsWithin(KTInputManager.Instance.SelectableManager.CurrentParent, _selectable);
 
             _selectable.Children[0] = _dummySelectable;
             _selectable.Init();
+
+            if (_dummySelectable.SelectableArea == null)
+                _dummySelectable.CreateSelectableArea();
+            _dummySelectable.SelectableArea?.ActivateSelectableArea();
 
             if (shouldCancel)
             {
                 StartCoroutine(CancelRoutine());
             }
 
-            /* if (currentSelectable && (currentSelectable.Parent == _selectable || (currentSelectable.Parent && currentSelectable.Parent.Parent == _selectable)))
-                _selectable.OnDrillTo(); */
-
-            /* if (currentSelectable && currentSelectable.Parent == _selectable)
-            {
-                _selectable.OnDrillTo();
-                currentSelectable.SetHighlight(false);
-                KTInputManager.Instance.Select(_dummySelectable);
-            } */
-
             if (KTInputManager.Instance.IsMotionControlMode())
                 _selectable.ActivateMotionControls();
-
-            // KTInputManager.Instance.SelectableManager.Select(_dummySelectable, false);
 
             // remove these events! the module doesn't stop listening for these when it's destroyed so it throws exceptions :(
             var holdable = _instantiatedComponent.Bomb.GetComponent<FloatingHoldable>();
